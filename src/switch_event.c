@@ -481,42 +481,51 @@ SWITCH_DECLARE(switch_status_t) switch_event_free_subclass_detailed(const char *
 
 SWITCH_DECLARE(switch_status_t) switch_event_reserve_subclass_detailed(const char *owner, const char *subclass_name)
 {
-	switch_status_t status = SWITCH_STATUS_SUCCESS;
-	switch_event_subclass_t *subclass;
+    switch_status_t status = SWITCH_STATUS_SUCCESS;
+    switch_event_subclass_t *subclass = NULL;
 
-	switch_mutex_lock(CUSTOM_HASH_MUTEX);
+    switch_mutex_lock(CUSTOM_HASH_MUTEX);
 
-	switch_assert(RUNTIME_POOL != NULL);
-	switch_assert(CUSTOM_HASH != NULL);
+    switch_assert(RUNTIME_POOL != NULL);
+    switch_assert(CUSTOM_HASH != NULL);
 
-	if ((subclass = switch_core_hash_find(CUSTOM_HASH, subclass_name))) {
-		/* a listener reserved it for us, now we can lock it so nobody else can have it */
-		if (subclass->bind) {
-			subclass->bind = 0;
-			switch_goto_status(SWITCH_STATUS_SUCCESS, end);
-		}
-		switch_goto_status(SWITCH_STATUS_INUSE, end);
-	}
+    if ((subclass = switch_core_hash_find(CUSTOM_HASH, subclass_name))) {
+        if (subclass->bind) {
+            subclass->bind = 0;
+            switch_goto_status(SWITCH_STATUS_SUCCESS, end);
+        }
+        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,
+            "Subclass '%s' is already in use.\n", subclass_name);
+        switch_goto_status(SWITCH_STATUS_INUSE, end);
+    }
 
-	switch_zmalloc(subclass, sizeof(*subclass));
+    switch_zmalloc(subclass, sizeof(*subclass));
+    if (!subclass) {
+        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,
+            "Memory allocation failed for subclass '%s'.\n", subclass_name);
+        status = SWITCH_STATUS_MEMERR;
+        goto end;
+    }
 
-	subclass->owner = DUP(owner);
-	subclass->name = DUP(subclass_name);
+    subclass->owner = DUP(owner);
+    subclass->name = DUP(subclass_name);
 
-	status = switch_core_hash_insert(CUSTOM_HASH, subclass->name, subclass);
+    status = switch_core_hash_insert(CUSTOM_HASH, subclass->name, subclass);
 
-	if (status != SWITCH_STATUS_SUCCESS) {
-		free(subclass->owner);
-		free(subclass->name);
-		free(subclass);
-	}
+    if (status != SWITCH_STATUS_SUCCESS) {
+        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,
+            "Failed to insert subclass '%s'. Status: %d\n", subclass_name, status);
+        free(subclass->owner);
+        free(subclass->name);
+        free(subclass);
+    }
 
 end:
+    switch_mutex_unlock(CUSTOM_HASH_MUTEX);
 
-	switch_mutex_unlock(CUSTOM_HASH_MUTEX);
-
-	return status;
+    return status;
 }
+
 
 SWITCH_DECLARE(void) switch_core_memory_reclaim_events(void)
 {
