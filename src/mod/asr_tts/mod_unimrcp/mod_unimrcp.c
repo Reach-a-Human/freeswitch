@@ -159,7 +159,7 @@ typedef struct profile profile_t;
 static switch_status_t profile_create(profile_t ** profile, const char *name, switch_memory_pool_t *pool);
 
 /* Profile events that may be monitored.  Useful for tracking MRCP profile utilization */
-#define MY_EVENT_PROFILE_CREATE "unimrcp::profile_create"
+#define MY_EVENT_PROFILE_CREATE "unimrcp::nigel_profile_create"
 #define MY_EVENT_PROFILE_OPEN "unimrcp::profile_open"
 #define MY_EVENT_PROFILE_CLOSE "unimrcp::profile_close"
 
